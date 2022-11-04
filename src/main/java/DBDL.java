@@ -1,58 +1,43 @@
-import com.gargoylesoftware.htmlunit.BrowserVersion;
-import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
-import com.gargoylesoftware.htmlunit.html.HtmlElement;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import org.openqa.selenium.htmlunit.HtmlUnitDriver;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.List;
-import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class DBDL {
 	public static void main(String[] args) throws IOException {
-		new DBDL().run();
+		new DBDL().run(args[0]);
 	}
-	private void run() throws IOException {
 
-		/*// Get the url
-		System.out.println("Enter channel url: ");
-		var scanner = new Scanner(System.in);
-		var channelUrl = scanner.next();*/
+	private void run(String url) throws IOException {
 
+		// Create file if there is none
+		File downloadedVideos = new File("downloaded.txt");
+		downloadedVideos.createNewFile();
+		var downloadEntryWriter = new DownloadEntryWriter(new FileWriter(downloadedVideos,true));
+		var downloadEntryReader = new DownloadEntryReader(new FileReader(downloadedVideos));
+		var downloader = new Downloader();
 
-		String strURL = "https://dreambroker.com/channel/rjvel23m" ;
-		java.util.logging.Logger.getLogger("com.gargoylesoftware.htmlunit").setLevel(java.util.logging.Level.OFF);
-		java.util.logging.Logger.getLogger("org.apache.http").setLevel(java.util.logging.Level.OFF);
+		// Read the video urls from the file, put them into a list
+		List<String> downloadedVideoUrls = downloadEntryReader.read()
+				.collect(Collectors.toList());
 
-		try (final WebClient webClient = new WebClient(BrowserVersion.FIREFOX)) {
-			webClient.getOptions().setThrowExceptionOnScriptError(false);
-			webClient.setAjaxController(new NicelyResynchronizingAjaxController());
+		var parser = new VideoHyperlinkParser(new URL(url));
+		var videoHyperlinks = parser.parse();
 
-			// Get the html
-			HtmlPage page = webClient.getPage(strURL);
-			webClient.waitForBackgroundJavaScript(10 * 1000);
+		videoHyperlinks.forEach(videoHyperlink -> {
 
-			// Retrieve all <div> elements containing video information
-			List<HtmlElement> elements = page.getByXPath("//div[@class=\"ember-view video-thumb-wrapper\"]");
-
-			if (!elements.isEmpty()) {
-				for (HtmlElement element : elements) {
-					String videoName = element.getAttribute("aria-label");
-
-					HtmlElement videoURLtag = element.getFirstByXPath(".//a");
-					String videoURL = videoURLtag.getAttribute("href");
-
-					System.out.println("Name: " + videoName);
-					System.out.println("URL: " + videoURL);
-					System.out.println("");
+			try {
+				var videoURL = videoHyperlink.getUrl();
+				var videoName = videoHyperlink.getName();
+				if (!downloadedVideoUrls.contains(videoURL)) {
+					File outputFile = new File(videoName + ".mp4");
+					downloader.download(videoURL, outputFile);
+					downloadEntryWriter.write(videoURL);
 				}
+			} catch (IOException e) {
+				throw new RuntimeException(e);
 			}
-		}
+		});
+		System.out.println("All videos have been downloaded.");
 	}
 }
