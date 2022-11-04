@@ -9,15 +9,12 @@ public class DBDL {
 	}
 
 	private void run(String url) throws IOException {
-
-		// Create file if there is none
 		File downloadedVideos = new File("downloaded.txt");
 		downloadedVideos.createNewFile();
 		var downloadEntryWriter = new DownloadEntryWriter(new FileWriter(downloadedVideos,true));
 		var downloadEntryReader = new DownloadEntryReader(new FileReader(downloadedVideos));
 		var downloader = new Downloader();
 
-		// Read the video urls from the file, put them into a list
 		List<String> downloadedVideoUrls = downloadEntryReader.read()
 				.collect(Collectors.toList());
 
